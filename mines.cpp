@@ -93,21 +93,21 @@ struct CursesUnderline {
 		{ if(this->enable) attroff(A_UNDERLINE); }
 };
 
-using Symbol = std::string;
-const std::set<Symbol> symbols = {
+using Name = std::string;
+const std::set<Name> symbols = {
 	"Zero", "One", "Two",
 	"Three", "Four", "Five",
 	"Six", "Seven", "Eight",
 	"Flag", "Mine", "Mark",
 	"Wrong", "Closed",
 };
-const std::vector<Symbol> numbers = {
+const std::vector<Name> numbers = {
 	"Zero", "One", "Two",
 	"Three", "Four", "Five",
 	"Six", "Seven", "Eight",
 };
 
-int index(const Symbol& sym)
+int index(const Name& sym)
 	{ return std::distance(symbols.begin(), symbols.find(sym)); }
 
 std::tuple<int,int,int> color(int n) {
@@ -119,10 +119,14 @@ std::tuple<int,int,int> color(int n) {
 using Action = std::string;
 using Key = std::variant<int, std::string>;
 
+struct Symbol {
+	std::wstring repr;
+	int foreground;
+	int background;
+};
+
 struct Config {
-	std::map<Symbol, std::wstring> symbols;
-	std::map<Symbol, int> foreground;
-	std::map<Symbol, int> background;
+	std::map<Name, Symbol> symbols;
 	std::map<Key, Action> keys;
 	int jump;
 	int width;
@@ -249,9 +253,8 @@ void draw(Game& game) {
 			}
 			CursesUnderline _underline(game.cursor == Vec2<int>{r, c});
 			color_set(index(symbol) + 1, NULL);
-			auto& symstring = game.config.symbols[symbol];
-			mvins_nwstr(r, c * game.config.gridWidth,
-				symstring.c_str(), symstring.size());
+			auto& repr = game.config.symbols[symbol].repr;
+			mvins_nwstr(r, c * game.config.gridWidth, repr.c_str(), repr.size());
 		}
 	footer(game);
 }
@@ -441,10 +444,10 @@ std::map<Action, std::function<void(Game&)>> actions = {
 	{ "Down",  [](Game& game) { move(game, { 1, 0}); } },
 	{ "Left",  [](Game& game) { move(game, {0, -1}); } },
 	{ "Right", [](Game& game) { move(game, {0,  1}); } },
-	{ "OpenUp",    [](Game& game) { } },
-	{ "OpenDown",  [](Game& game) { } },
-	{ "OpenLeft",  [](Game& game) { } },
-	{ "OpenRight", [](Game& game) { } },
+	{ "OpenUp",    [](Game& game) { move(game, {-1, 0}); open(game, game.cursor, true); } },
+	{ "OpenDown",  [](Game& game) { move(game, { 1, 0}); open(game, game.cursor, true); } },
+	{ "OpenLeft",  [](Game& game) { move(game, {0, -1}); open(game, game.cursor, true); } },
+	{ "OpenRight", [](Game& game) { move(game, {0,  1}); open(game, game.cursor, true); } },
 	{ "JumpUp",    [](Game& game) { move(game, {-game.config.jump, 0}); } },
 	{ "JumpDown",  [](Game& game) { move(game, { game.config.jump, 0}); } },
 	{ "JumpLeft",  [](Game& game) { move(game, {0, -game.config.jump}); } },
@@ -465,52 +468,20 @@ int main() {
 		.state = State::Start,
 		.config = Config {
 			.symbols = {
-				{ "Zero",   L"　" },
-				{ "One",    L"１" },
-				{ "Two",    L"２" },
-				{ "Three",  L"３" },
-				{ "Four",   L"４" },
-				{ "Five",   L"５" },
-				{ "Six",    L"６" },
-				{ "Seven",  L"７" },
-				{ "Eight",  L"８" },
-				{ "Flag",   L"🚩" },
-				{ "Mine",   L"💥" },
-				{ "Mark",   L"❔" },
-				{ "Wrong",  L"❌" },
-				{ "Closed", L"· " },
-			},
-			.foreground = {
-				{ "Zero",   0x404040 },
-				{ "One",    0x0000ff },
-				{ "Two",    0x00ff00 },
-				{ "Three",  0xff0000 },
-				{ "Four",   0x4040ff },
-				{ "Five",   0xff4040 },
-				{ "Six",    0x00ffff },
-				{ "Seven",  0xffffff },
-				{ "Eight",  0x808080 },
-				{ "Flag",   0xff0000 },
-				{ "Mine",   0xff0000 },
-				{ "Mark",   0xf0f0f0 },
-				{ "Wrong",  0xfff0f0 },
-				{ "Closed", 0xffffff },
-			},
-			.background = {
-				{ "Zero",   0x000000 },
-				{ "One",    0x000000 },
-				{ "Two",    0x000000 },
-				{ "Three",  0x000000 },
-				{ "Four",   0x000000 },
-				{ "Five",   0x000000 },
-				{ "Six",    0x000000 },
-				{ "Seven",  0x000000 },
-				{ "Eight",  0x000000 },
-				{ "Flag",   0x202020 },
-				{ "Mine",   0x202020 },
-				{ "Mark",   0x202020 },
-				{ "Wrong",  0x202020 },
-				{ "Closed", 0x202020 },
+				{ "Zero",   { L"　", 255, 232 } },
+				{ "One",    { L"１", 105, 232 } },
+				{ "Two",    { L"２", 120, 232 } },
+				{ "Three",  { L"３", 210, 232 } },
+				{ "Four",   { L"４",  21, 232 } },
+				{ "Five",   { L"５", 196, 232 } },
+				{ "Six",    { L"６",  33, 232 } },
+				{ "Seven",  { L"７", 255, 232 } },
+				{ "Eight",  { L"８", 248, 232 } },
+				{ "Flag",   { L"🚩", 196, 238 } },
+				{ "Mine",   { L"💥", 214, 238 } },
+				{ "Mark",   { L"❔", 226, 238 } },
+				{ "Wrong",  { L"❌", 201, 238 } },
+				{ "Closed", { L"· ", 255, 238 } },
 			},
 			.keys = {
 				{ 'u', "Up" },
@@ -569,44 +540,37 @@ int main() {
 		check_keys("unknown symbols:", config_check, symbols);
 		check_keys("missing symbols:", symbols, config_check);
 		config_check.clear();
-		for(const auto& [ x, _ ]: game.config.foreground) config_check.insert(x);
-		check_keys("unknown foreground colors:", config_check, symbols);
-		check_keys("missing foreground colors:", symbols, config_check);
-		config_check.clear();
-		for(const auto& [ x, _ ]: game.config.background) config_check.insert(x);
-		check_keys("unknown background colors:", config_check, symbols);
-		check_keys("missing background colors:", symbols, config_check);
 	}
 
 	game.config.gridWidth = std::accumulate(
 		game.config.symbols.begin(), game.config.symbols.end(), 0,
 		[](int x, const auto& y) { return std::max(x,
-			wcswidth(y.second.c_str(), y.second.size())); });
+			wcswidth(y.second.repr.c_str(), y.second.repr.size())); });
 	for(auto& [ _, x ]: game.config.symbols)
-		x.insert(x.end(), game.config.gridWidth - wcswidth(x.c_str(), x.size()), ' ');
+		x.repr.insert(x.repr.end(), game.config.gridWidth
+			- wcswidth(x.repr.c_str(), x.repr.size()), ' ');
 	game.cursor = Vec2<int>{game.config.height, game.config.width} / 2;
 	restart(game);
 
 	CursesWindow _cwin;
 
-	for(auto& [ k, v ]: game.config.foreground) {
-		auto [ r, g, b ] = color(v);
-		init_color(index(k) + 8, r, g, b);
-	}
-	for(auto& [ k, v ]: game.config.background) {
-		auto [ r, g, b ] = color(v);
-		init_color(index(k) + 8 + symbols.size(), r, g, b);
-	}
-	for(auto& k: symbols) {
-		auto n = index(k);
-		init_pair(n + 1, n + 8, n + 8 + symbols.size());
-	}
+	for(auto& [ name, sym ]: game.config.symbols)
+		init_pair(index(name) + 1, sym.foreground, sym.background);
 
 	draw(game);
 	std::thread _update(update, &game);
 
 	while(true) {
-		auto action = game.config.keys.find(getkey());
+		auto key = getkey();
+		std::visit(overloaded {
+			[&](int key) { R::trace(R::now(), keyname(key)); },
+			[&](std::string key) {
+				key.erase(0, 1);
+				key.insert(0, "\\x1b");
+				R::trace(R::now(), R::wconvert<std::string, std::wstring>(std::move(key)));
+			},
+		}, key);
+		auto action = game.config.keys.find(key);
 		std::unique_lock _lock(game.mutex);
 		if(action != game.config.keys.end()) {
 			try {
