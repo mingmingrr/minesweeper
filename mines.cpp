@@ -619,23 +619,22 @@ int main() {
 			},
 		}, key);
 		auto action = game.config.keys.find(key);
+		if(action == game.config.keys.end()) continue;
 		std::unique_lock _lock(game.mutex);
-		if(action != game.config.keys.end()) {
-			try {
-				actions[action->second](game);
-			} catch(const QuitGame& exc) {
-				game.state = State::Quit;
-				break;
-			} catch(const GameException& exc) {
-				alltiles(game, [&](const auto& posn, auto& tile) {
-					if(tile.open && tile.mine)
-						tile.mark = Mark::Mine;
-					else if(!tile.mine && tile.mark == Mark::Flag)
-						tile.mark = Mark::Wrong;
-					else if(tile.mine && tile.mark != Mark::Flag)
-						tile.mark = Mark::Mine;
-				});
-			}
+		try {
+			actions[action->second](game);
+		} catch(const QuitGame& exc) {
+			game.state = State::Quit;
+			break;
+		} catch(const GameException& exc) {
+			alltiles(game, [&](const auto& posn, auto& tile) {
+				if(tile.open && tile.mine)
+					tile.mark = Mark::Mine;
+				else if(!tile.mine && tile.mark == Mark::Flag)
+					tile.mark = Mark::Wrong;
+				else if(tile.mine && tile.mark != Mark::Flag)
+					tile.mark = Mark::Mine;
+			});
 		}
 		erase();
 		draw(game);
