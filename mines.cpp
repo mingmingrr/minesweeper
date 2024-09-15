@@ -71,6 +71,7 @@ struct CursesWindow {
 		mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);
 		mouseinterval(0);
 		start_color();
+		use_default_colors();
 		clear();
 	}
 	~CursesWindow() {
@@ -143,6 +144,7 @@ struct Stats {
 	std::chrono::time_point<std::chrono::steady_clock> timeStart;
 	std::chrono::time_point<std::chrono::steady_clock> timeNow;
 	int openTimes;
+	int markTimes;
 	int flagTimes;
 	int chordTimes;
 	int moveTimes;
@@ -369,6 +371,17 @@ void flag(Game& game, Vec2<int> posn, bool user) {
 		tile.mark = Mark::Flag;
 }
 
+void mark(Game& game, Vec2<int> posn, bool user) {
+	if(game.state != State::Running) return;
+	auto& tile = index(game, posn);
+	if(tile.open) return;
+	if(user) game.stats.markTimes += 1;
+	if(tile.mark == Mark::Mark && user)
+		tile.mark = Mark::None;
+	else if(tile.mark != Mark::Mark)
+		tile.mark = Mark::Mark;
+}
+
 void generate(Game& game) {
 	game.state = State::Running;
 	std::vector<Vec2<int>> mines, posns;
@@ -437,6 +450,7 @@ void restart(Game& game) {
 		.timeStart = time,
 		.timeNow = time,
 		.openTimes = 0,
+		.markTimes = 0,
 		.flagTimes = 0,
 		.chordTimes = 0,
 		.moveTimes = 0,
@@ -485,7 +499,7 @@ std::map<Action, std::function<void(Game&)>> actions = {
 	{ "JumpLeft",  [](Game& game) { move(game, {0, -game.config.jump}); } },
 	{ "JumpRight", [](Game& game) { move(game, {0,  game.config.jump}); } },
 	{ "Flag",    [](Game& game) { flag(game, game.cursor, true); } },
-	{ "Mark",    [](Game& game) { } },
+	{ "Mark",    [](Game& game) { mark(game, game.cursor, true); } },
 	{ "Open",    [](Game& game) { open(game, game.cursor, true); } },
 	{ "Restart", [](Game& game) { restart(game); } },
 	{ "Quit",    [](Game& game) { throw QuitGame(); } },
