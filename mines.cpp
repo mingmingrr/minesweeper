@@ -226,10 +226,13 @@ void footer(Game& game) {
 		case State::Running: out << L"🙂"; break;
 		case State::Finished: out << L"😎"; break;
 		case State::Exploded: out << L"😵"; break;
+		case State::Quit: return;
 	}
-	out << ' ';
-	out << std::fixed << std::setprecision(1) << std::chrono::duration<double>
-		(game.stats.timeNow - game.stats.timeStart).count();
+	const auto& stats = game.stats;
+	std::chrono::duration<double> time = stats.timeNow - stats.timeStart;
+	out << L" 🕖" << std::fixed << std::setprecision(1) << time.count()
+		<< L" 🖱" << stats.openTimes << L" 🚩" << stats.flagTimes
+		<< L" 🎜" << stats.chordTimes << L" ❔" << stats.markTimes;
 	auto str = out.str();
 	color_set(0, NULL);
 	move(game.config.height, 0);
@@ -321,24 +324,31 @@ void open1(Game& game, Vec2<int> posn) {
 	auto& tile = index(game, posn);
 	if(tile.open) return;
 	if(tile.mark == Mark::Flag) return;
-	if(tile.mine) throw OpenMineTile();
+	if(tile.mine) {
+		game.state = State::Exploded;
+		throw OpenMineTile();
+	}
 	tile.open = true;
 	tile.mark = Mark::None;
 	game.stats.closedCount -= 1;
-	if(game.stats.closedCount == 0) throw AllTilesOpened();
+	if(game.stats.closedCount == 0) {
+		game.state = State::Finished;
+		throw AllTilesOpened();
+	}
 	if(tile.count == 0) neighbors(game, posn,
 		[&](const auto& posn, const auto& tile) { open1(game, posn); });
 }
 
 void open(Game& game, Vec2<int> posn, bool user) {
-	if(user && game.state == State::Running)
-		game.stats.openTimes += 1;
 	const auto& tile = index(game, posn);
 	switch(game.state) {
 		case State::Start: generate(game); break;
 		case State::Running:
-			if(!tile.open) open1(game, posn);
-			else if(user) chord(game, posn, user);
+			if(!tile.open) {
+				if(user) game.stats.openTimes += 1;
+				open1(game, posn);
+			} else if(user)
+				chord(game, posn, user);
 			break;
 		default: break;
 	}
@@ -346,11 +356,13 @@ void open(Game& game, Vec2<int> posn, bool user) {
 
 void flag(Game& game, Vec2<int> posn, bool user) {
 	if(game.state != State::Running) return;
-	if(user) game.stats.flagTimes += 1;
 	auto& tile = index(game, posn);
-	if(tile.open && user)
+	if(tile.open && user) {
 		chord(game, posn, user);
-	else if(!tile.open && tile.mark == Mark::Flag && user)
+		return;
+	}
+	if(user) game.stats.flagTimes += 1;
+	if(!tile.open && tile.mark == Mark::Flag && user)
 		tile.mark = Mark::None;
 	else if(!tile.open && tile.mark != Mark::Flag)
 		tile.mark = Mark::Flag;
@@ -558,7 +570,7 @@ int main() {
 		init_pair(index(name) + 1, sym.foreground, sym.background);
 
 	draw(game);
-	std::thread _update(update, &game);
+	std::thread(update, &game).detach();
 
 	while(true) {
 		auto key = getkey();
@@ -579,7 +591,6 @@ int main() {
 				game.state = State::Quit;
 				break;
 			} catch(const GameException& exc) {
-				game.state = State::Finished;
 				alltiles(game, [&](const auto& posn, auto& tile) {
 					if(tile.open && tile.mine)
 						tile.mark = Mark::Mine;
@@ -594,7 +605,5 @@ int main() {
 		draw(game);
 		refresh();
 	}
-
-	_update.join();
 }
 
