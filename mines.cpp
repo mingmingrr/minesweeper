@@ -62,7 +62,7 @@ Vec2_operator(|)
 
 struct CursesWindow {
 	CursesWindow() {
-		ESCDELAY = 10;
+		ESCDELAY = 5;
 		initscr();
 		cbreak();
 		noecho();
@@ -119,7 +119,6 @@ std::tuple<int,int,int> color(int n) {
 }
 
 using Action = std::string;
-using Key = std::variant<int, std::string>;
 
 struct Symbol {
 	std::wstring repr;
@@ -129,7 +128,7 @@ struct Symbol {
 
 struct Config {
 	std::map<Name, Symbol> symbols;
-	std::map<Key, Action> keys;
+	std::map<int, Action> keys;
 	int jump;
 	int width;
 	int height;
@@ -185,26 +184,6 @@ struct Game {
 	bool mouse;
 	Stats stats;
 };
-
-Key getkey() {
-	int head = getch();
-	if(head != 0x1b) return head;
-	std::string bits = "\x1b";
-	CursesNoDelay _nodelay;
-	int csi = getch();
-	if(csi == -1) return bits;
-	bits.push_back(csi);
-	if(csi != '[') return bits;
-	int bit = getch();
-	while('0' <= bit && bit <= '?')
-		{ bits.push_back(bit); bit = getch(); }
-	while(' ' <= bit && bit <= '/')
-		{ bits.push_back(bit); bit = getch(); }
-	if('@' <= bit && bit <= '~')
-		{ bits.push_back(bit); bit = getch(); }
-	if(bit != -1) ungetch(bit);
-	return bits;
-}
 
 void check_keys(
 	std::string msg,
@@ -609,15 +588,8 @@ int main() {
 	std::thread(update, &game).detach();
 
 	while(true) {
-		auto key = getkey();
-		std::visit(overloaded {
-			[&](int key) { R::trace(R::now(), keyname(key)); },
-			[&](std::string key) {
-				key.erase(0, 1);
-				key.insert(0, "\\x1b");
-				R::trace(R::now(), R::wconvert<std::string, std::wstring>(std::move(key)));
-			},
-		}, key);
+		auto key = getch();
+		R::trace(R::now(), keyname(key));
 		auto action = game.config.keys.find(key);
 		if(action == game.config.keys.end()) continue;
 		std::unique_lock _lock(game.mutex);
