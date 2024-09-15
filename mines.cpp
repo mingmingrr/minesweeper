@@ -69,6 +69,7 @@ struct CursesWindow {
 		curs_set(false);
 		keypad(stdscr, true);
 		mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);
+		mouseinterval(0);
 		start_color();
 		clear();
 	}
@@ -451,6 +452,25 @@ void move(Game& game, Vec2<int> dirn) {
 	game.cursor.y = std::clamp(game.cursor.y + dirn.y, 0, game.config.width - 1);
 }
 
+void mouse(Game& game) {
+	MEVENT event;
+	getmouse(&event);
+	R::trace(R::now(), event.bstate, event.id, event.x, event.y, event.z);
+	if(event.x < game.config.gridWidth * game.config.width
+		&& event.y < game.config.height
+	) {
+		game.cursor = { event.y, event.x / game.config.gridWidth };
+		if(event.bstate & (BUTTON1_PRESSED | BUTTON4_PRESSED | BUTTON5_PRESSED))
+			open(game, game.cursor, true);
+		if(event.bstate & BUTTON3_PRESSED)
+			flag(game, game.cursor, true);
+		if(event.bstate & BUTTON2_PRESSED)
+			chord(game, game.cursor, true);
+	} else if(event.y == game.config.height && event.x == 0) {
+		restart(game);
+	}
+}
+
 std::map<Action, std::function<void(Game&)>> actions = {
 	{ "Up",    [](Game& game) { move(game, {-1, 0}); } },
 	{ "Down",  [](Game& game) { move(game, { 1, 0}); } },
@@ -469,6 +489,7 @@ std::map<Action, std::function<void(Game&)>> actions = {
 	{ "Open",    [](Game& game) { open(game, game.cursor, true); } },
 	{ "Restart", [](Game& game) { restart(game); } },
 	{ "Quit",    [](Game& game) { throw QuitGame(); } },
+	{ "Mouse",   [](Game& game) { mouse(game); } },
 };
 
 int main() {
@@ -528,6 +549,7 @@ int main() {
 				{ KEY_F(2), "Restart" },
 				{ 'q', "Quit" },
 				{ 0x1b, "Quit" },
+				{ KEY_MOUSE, "Mouse" },
 			},
 			.jump = 5,
 			.width = 30,
