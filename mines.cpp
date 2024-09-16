@@ -18,14 +18,12 @@
 #include <functional>
 #include <shared_mutex>
 #include <mutex>
+#include <ios>
+#include <iostream>
+#include <iomanip>
 #include <ncursesw/curses.h>
 
 using namespace std::chrono_literals;
-
-#define DEBUGTRACE_WIDE 1
-#define DEBUGTRACE_OUTPUT_FILE "debug.fifo"
-#include "trace.hpp"
-namespace R = debugtrace;
 
 template<typename... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
@@ -403,7 +401,6 @@ void generate(Game& game) {
 		}
 		repr << std::endl;
 	}
-	R::trace(repr.str());
 	const auto time = std::chrono::steady_clock::now();
 	game.stats.timeStart = time;
 	game.stats.timeNow = time;
@@ -448,7 +445,6 @@ void move(Game& game, Vec2<int> dirn) {
 void mouse(Game& game) {
 	MEVENT event;
 	getmouse(&event);
-	R::trace(R::now(), event.bstate, event.id, event.x, event.y, event.z);
 	if(event.x < game.config.gridWidth * game.config.width
 		&& event.y < game.config.height
 	) {
@@ -486,7 +482,6 @@ std::map<Action, std::function<void(Game&)>> actions = {
 };
 
 int main() {
-	R::trace(R::now(), "========================================");
 	std::locale::global(std::locale(""));
 	srand(time(NULL));
 
@@ -589,7 +584,6 @@ int main() {
 
 	while(true) {
 		auto key = getch();
-		R::trace(R::now(), keyname(key));
 		auto action = game.config.keys.find(key);
 		if(action == game.config.keys.end()) continue;
 		std::unique_lock _lock(game.mutex);
